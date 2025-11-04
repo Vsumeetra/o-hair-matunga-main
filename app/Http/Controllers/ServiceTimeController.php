@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\ServiceTime;
+use App\Models\Service;
+
 use Illuminate\Support\Facades\DB;
 
 class ServiceTimeController extends Controller
@@ -48,65 +50,132 @@ class ServiceTimeController extends Controller
             ], 500);
         }
     }
+public function index(Request $request)
+{
+    $serviceId = $request->query('service_id');
+    $perPage = $request->query('per_page', 10);
+    $page = $request->query('page', 1);
+    $search = $request->query('search'); // fixed typo "serach" → "search"
+    $main_category_id = $request->query('main_category_id');
+    $category_id = $request->query('category_id');
+
+    // Base query
+
+
+    // Build query
+    $query = Service::with(['SubCategory', 'SubCategory.MainCategory','serviceTimes'])
+        ->whereHas('serviceTimes'); // ✅ Only services having related serviceTimes
+
+    // Optional: Filter by specific service ID
+    if ($serviceId) {
+        $query->where('id', $serviceId);
+    }
+
+    // Optional: Search by name or title (if column exists)
+    if ($search) {
+        $query->where('name', 'like', "%{$search}%");
+    }
+    if ($main_category_id) {
+        $query->whereHas('SubCategory', function ($q) use ($main_category_id) {
+            $q->where('main_category_id', $main_category_id);
+        });
+    }
+        if ($category_id) {
+        $query->whereHas('SubCategory', function ($q) use ($category_id) {
+            $q->where('id', $category_id);
+        });
+    }
+
+    
+
+
+    // Pagination
+    $services = $query->paginate($perPage, ['*'], 'page', $page);
+
+    return response()->json($services);
+}
+
+
 
     /**
      * List & filter service times
      * Filters: service_name, day, slot, main_category_id, category_id
      */
-   public function index(Request $request)
-{
-    // Get query parameters
-    $mainCategoryId = $request->query('main_category_id');
-    $serviceName = $request->query('service_name');
-    $day = $request->query('day');
-    $slot = $request->query('slot');
-    $perPage = $request->query('per_page', 10); 
+// public function index(Request $request)
+// {
+//     $mainCategoryId = $request->query('main_category_id');
+//     $serviceName = $request->query('service_name');
+//     $day = $request->query('day');
+//     $slot = $request->query('slot');
+//     $perPage = $request->query('per_page', 10);
+
+//     // Base query
+//     // $query = ServiceTime::with(['service.SubCategory.MainCategory']);
+//    $query = ServiceTime::with(['service.SubCategory']);
+
+//    if ($mainCategoryId) {
+//     $query->whereHas('service.SubCategory', function ($q) use ($mainCategoryId) {
+//         $q->where('main_category_id', $mainCategoryId);
+//     });
+// }
+
+
+//     if ($serviceName) {
+//         $query->whereHas('service', function ($q) use ($serviceName) {
+//             $q->where('name', 'like', '%' . $serviceName . '%');
+//         });
+//     }
+
+//     if ($day) {
+//         $query->where('day', $day);
+//     }
+
+//     if ($slot) {
+//         $query->where('slot', 'like', '%' . $slot . '%');
+//     }
+
+//     $serviceTimes = $query->orderBy('day')->paginate($perPage);
+
+//     if ($serviceTimes->isEmpty()) {
+//         return response()->json([
+//             'message' => 'No services available for the selected filters.'
+//         ], 200);
+//     }
+
+//     // Group
+//     $grouped = [];
+//     foreach ($serviceTimes as $item) {
+//         $service = $item->service;
+
+//         if (!isset($grouped[$service->id])) {
+//             $grouped[$service->id] = [
+//                 'service_id' => $service->id,
+//                 'service_name' => $service->name,
+//                 'description' => $service->description,
+//                 'price' => $service->price,
+//                 'category' => optional($service->SubCategory)->name ?? null,
+//                 'main_category' => optional($service->SubCategory->MainCategory)->name ?? null,
+//                 'slots' => [],
+//             ];
+//         }
+
+//         $grouped[$service->id]['slots'][] = [
+//             'id' => $item->id,
+//             'day' => $item->day,
+//             'slot' => $item->slot,
+//         ];
+//     }
 
    
-    $query = ServiceTime::query()->with([
-        'service.SubCategory.MainCategory' 
-    ]);
+//     $serviceTimes->setCollection(collect(array_values($grouped)));
 
-    //  Filter by Main Category
-    if ($mainCategoryId) {
-        $query->whereHas('service.SubCategory.MainCategory', function ($q) use ($mainCategoryId) {
-            $q->where('id', $mainCategoryId);
-        });
-    }
+//     return response()->json([
+//         'message' => 'Service times grouped by service fetched successfully.',
+//         'data' => $serviceTimes
+//     ], 200);
+// }
 
-    // Filter by Service Name 
-    if ($serviceName) {
-        $query->whereHas('service', function ($q) use ($serviceName) {
-            $q->where('name', 'like', '%' . $serviceName . '%');
-        });
-    }
 
-    //  Filter by Day 
-    if ($day) {
-        $query->where('day', $day);
-    }
-
-    //  Filter by Slot 
-    if ($slot) {
-        $query->where('slot', 'like', '%' . $slot . '%');
-    }
-
-    
-    $serviceTimes = $query->orderBy('day')->paginate($perPage);
-
-    
-    if ($serviceTimes->isEmpty()) {
-        return response()->json([
-            'message' => 'No services available for the selected filters.'
-        ], 200);
-    }
-
-    //  Return the data
-    return response()->json([
-        'message' => 'Service times fetched successfully.',
-        'data' => $serviceTimes
-    ], 200);
-}
 
 
     /**
