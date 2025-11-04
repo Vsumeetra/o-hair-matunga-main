@@ -141,6 +141,7 @@ class ServiceTimeController extends Controller
         return response()->json([
             'message' => 'Service time updated successfully.',
             'service_time' => $serviceTime
+            // 'service_time' => $serviceTime->fresh('service')
         ]);
     }
 
